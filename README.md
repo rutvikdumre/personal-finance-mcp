@@ -1,7 +1,8 @@
 # personal-finance-mcp (local)
 
-Read-only MCP server that lets Claude query my Chase and Amex accounts through
-Plaid's free Trial plan (up to 10 connections). Runs locally, on `127.0.0.1` only.
+Read-only MCP server that lets Claude query your bank and credit card accounts
+(Chase, Amex, and most US banks) through Plaid's free Trial plan (up to 10
+connections). Runs locally, on `127.0.0.1` only. Your keys never leave your machine.
 
 Based on [JosueM1109/personal-finance-mcp](https://github.com/JosueM1109/personal-finance-mcp)
 (MIT), vendored at upstream commit `33e0343` after a code review. The original
@@ -29,7 +30,7 @@ python3 setup.py        # Windows: py setup.py
 ```
 
 1. Paste the Client ID and Production secret when prompted.
-2. A browser opens at `localhost:8765`. Link Chase, then Amex, then press Enter in the terminal.
+2. A browser opens at `localhost:8765`. Link each bank or card, then press Enter in the terminal.
 3. Start the server (leave the terminal open):
 
    ```bash
@@ -55,7 +56,7 @@ No tool can move money or change anything at a bank.
 
 - `.env` holds the Plaid secret and the per-bank access tokens. It's gitignored
   and set to `chmod 600` on macOS/Linux. **Never commit it.**
-- Keep this repo **private**.
+- Fork or clone freely; your secrets live only in your local `.env`, never in the repo.
 - If a token leaks, revoke it in the Plaid dashboard and rotate the secret.
 - Don't expose port 8000 to the internet without adding auth first (see
   `docs/DEPLOYMENT.md`). Remote access for claude.ai is a separate, later step.
