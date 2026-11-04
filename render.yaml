@@ -1,0 +1,21 @@
+# Deploy to Render blueprint: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: personal-finance-mcp
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      # Render generates a random 256-bit token. Copy it from the
+      # Environment tab and pass it to your MCP client as a bearer token.
+      - key: MCP_AUTH_TOKEN
+        generateValue: true
+      - key: PLAID_CLIENT_ID
+        sync: false
+      - key: PLAID_SECRET
+        sync: false
+      - key: PLAID_ENV
+        value: production
+      # After deploying, add one PLAID_TOKEN_<BANK> variable per linked bank
+      # (copy them from the .env that setup.py writes on your laptop).

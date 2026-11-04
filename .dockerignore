@@ -1,7 +1,12 @@
 .env
 .env.*
 .venv/
+venv/
+.git/
 __pycache__/
 .pytest_cache/
 tests/
+docs/
 *.md
+link_helper.py
+setup.py

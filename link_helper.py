@@ -9,7 +9,7 @@ Usage:
 
 Then open http://localhost:8765 in your browser, click "Link a bank",
 complete the Plaid Link flow, and paste the printed env var line into
-your local .env and your deployment's env settings.
+your local .env (setup.py does this for you) and your host's env vars.
 
 For re-auth (ITEM_LOGIN_REQUIRED):
     curl -X POST localhost:8765/create-link-token \\
@@ -22,9 +22,10 @@ from __future__ import annotations
 import os
 import sys
 
-# Defense-in-depth: refuse to run on Horizon (deployment env).
-if os.environ.get("HORIZON"):
-    sys.exit("link_helper.py must not run on Horizon. Run locally only.")
+# Defense-in-depth: this tool must never run on a deployed server.
+# (The Docker image doesn't include it either.)
+if os.environ.get("HORIZON") or os.environ.get("RENDER") or os.environ.get("RAILWAY_ENVIRONMENT"):
+    sys.exit("link_helper.py is a local-only tool. Run it on your own machine.")
 
 from dotenv import load_dotenv
 
@@ -111,7 +112,7 @@ def exchange(req: ExchangeReq) -> dict:
     print("=" * 60, flush=True)
     print(f"Institution: {ins_name}", flush=True)
     print(f"Item ID:     {item_id}", flush=True)
-    print("Add this to your .env (local) and Horizon env (prod):", flush=True)
+    print("Add this to your .env (local) and your host's env vars (cloud):", flush=True)
     print(f"  {env_key}={access_token}", flush=True)
     print("Do NOT commit this line.", flush=True)
     print("=" * 60, flush=True)

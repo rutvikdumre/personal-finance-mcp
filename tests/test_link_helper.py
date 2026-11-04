@@ -17,7 +17,7 @@ def test_horizon_guard_blocks_import():
         cwd=REPO_ROOT,
     )
     assert result.returncode != 0
-    assert "must not run on Horizon" in (result.stderr + result.stdout)
+    assert "local-only tool" in (result.stderr + result.stdout)
 
 
 def test_index_returns_html(fake_env_tokens):
