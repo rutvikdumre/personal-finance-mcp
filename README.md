@@ -65,7 +65,7 @@ cd personal-finance-mcp
 python3 setup.py          # Windows: py setup.py
 ```
 
-`setup.py` creates a virtualenv, asks for your Plaid keys (hidden input), opens a local page where you log in to each bank, and saves everything to `.env`. If the `claude` CLI is installed, it also registers the server with Claude Code.
+`setup.py` creates a virtualenv, asks for your Plaid keys (hidden input), opens a local page where you log in to each bank, and saves everything to `.env`. The page lists every connected bank with its logo, accounts and connection status, so you can see at a glance what's linked and what needs a fresh login. If the `claude` CLI is installed, it also registers the server with Claude Code.
 
 **3. Start the server.**
 
