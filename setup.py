@@ -6,19 +6,18 @@ Run from the repo root:
        python3 setup.py          (macOS / Linux)
        py setup.py               (Windows)
 
-Needs: Python 3.11+, plus your Plaid Trial client_id and
-Production secret (dashboard.plaid.com -> Team Settings -> API).
+Needs: Python 3.11+, plus your Plaid client_id and secret
+(dashboard.plaid.com -> Developers -> Keys).
 
 What it does:
   1. (repo is already cloned: you're in it)
   2. Creates a virtualenv and installs dependencies
   3. Asks for your Plaid keys (hidden input) and writes .env
-  4. Starts the Plaid Link helper so you can log in to Chase / Amex,
+  4. Starts the Plaid Link helper so you can log in to each bank,
      and saves each bank's access token into .env automatically
-  5. run_local.py (in this repo) binds the server to 127.0.0.1 only
-     (upstream binds 0.0.0.0, i.e. your whole Wi-Fi network, with no auth)
-     and loads .env (upstream server.py doesn't)
-  6. Registers the server with Claude Code if the `claude` CLI is installed
+  5. Registers the server with Claude Code if the `claude` CLI is installed
+
+Re-run it any time to link another bank.
 """
 from __future__ import annotations
 
@@ -85,12 +84,12 @@ def main() -> None:
         env["PLAID_SECRET"] = getpass.getpass("  PLAID_SECRET (Production): ").strip()
         if not env["PLAID_CLIENT_ID"] or not env["PLAID_SECRET"]:
             sys.exit("Both keys are required.")
-    env["PLAID_ENV"] = "production"
+    env.setdefault("PLAID_ENV", "production")
     write_env(env)
 
     # 5. Link banks
     step("Starting the bank-link page at http://localhost:8765")
-    print("  In the browser: click 'Link a bank', log in to Chase, then repeat for Amex.")
+    print("  In the browser: click 'Link a bank' and log in. Repeat for each bank or card.")
     print("  Tokens are saved to .env automatically. Come back here and press Enter when done.")
     proc = subprocess.Popen(
         [str(VENV_PY), "-m", "uvicorn", "link_helper:app", "--host", "127.0.0.1", "--port", "8765"],
@@ -126,7 +125,7 @@ def main() -> None:
 
     # 6. Register with Claude Code
     url = "http://127.0.0.1:8000/mcp"
-    start_cmd = f'"{VENV_PY}" "{DEST / "run_local.py"}"'
+    start_cmd = f'"{VENV_PY}" "{DEST / "server.py"}"'
     if shutil.which("claude"):
         step("Registering with Claude Code")
         subprocess.run(["claude", "mcp", "add", "--scope", "user", "--transport", "http",
@@ -142,7 +141,10 @@ def main() -> None:
   Claude Desktop: Settings -> Connectors / Developer -> add a local MCP server at {url}
 
   Then ask Claude: "list my accounts" or "what did I spend on dining last month?"
-  Re-run this script to link more banks or re-authenticate one.
+  Re-run this script to link more banks.
+
+  Deploying to the cloud? Copy PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV and
+  every PLAID_TOKEN_* line from {ENV_FILE} into your host's environment variables.
 """)
 
 

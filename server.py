@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import hmac
+import ipaddress
 import os
+import sys
 from datetime import date, timedelta
 
 from fastmcp import FastMCP
+from fastmcp.server.auth import TokenVerifier
+from fastmcp.server.auth.auth import AccessToken
 from plaid.exceptions import ApiException
 from plaid.model.accounts_balance_get_request import AccountsBalanceGetRequest
 from plaid.model.accounts_balance_get_request_options import AccountsBalanceGetRequestOptions
@@ -27,6 +32,51 @@ from plaid_client import (
 )
 
 mcp = FastMCP("personal-finance-mcp")
+
+MIN_AUTH_TOKEN_LENGTH = 32
+
+
+class BearerTokenVerifier(TokenVerifier):
+    """Accepts exactly one bearer token: the MCP_AUTH_TOKEN you configured."""
+
+    def __init__(self, expected_token: str) -> None:
+        super().__init__()
+        self._expected = expected_token.encode()
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        if token and hmac.compare_digest(token.encode(), self._expected):
+            return AccessToken(token=token, client_id="owner", scopes=[])
+        return None
+
+
+def build_auth() -> BearerTokenVerifier | None:
+    """Return a verifier if MCP_AUTH_TOKEN is set, else None (no auth)."""
+    token = os.getenv("MCP_AUTH_TOKEN", "").strip()
+    if not token:
+        return None
+    if len(token) < MIN_AUTH_TOKEN_LENGTH:
+        raise ValueError(
+            f"MCP_AUTH_TOKEN must be at least {MIN_AUTH_TOKEN_LENGTH} characters. "
+            'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(32))"'
+        )
+    return BearerTokenVerifier(token)
+
+
+def is_loopback(host: str) -> bool:
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health(_request):
+    """Unauthenticated liveness check for hosting platforms. Returns no data."""
+    from starlette.responses import PlainTextResponse
+
+    return PlainTextResponse("ok")
 
 
 def _warning_from_health(h: ItemHealth) -> dict:
@@ -552,9 +602,39 @@ search_transactions = mcp.tool(
 )(_search_transactions_impl)
 
 
-if __name__ == "__main__":
-    mcp.run(
-        transport="http",
-        host="0.0.0.0",
-        port=int(os.getenv("PORT", "8000")),
+def main() -> None:
+    """Start the HTTP server.
+
+    Defaults to 127.0.0.1 (this machine only). To listen on a network, set
+    HOST=0.0.0.0 and MCP_AUTH_TOKEN; the server refuses to start publicly
+    without a token, because every tool returns your bank data.
+    """
+    from dotenv import load_dotenv
+
+    # Local .env for development; on a cloud host the platform sets env vars.
+    load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+
+    host = os.getenv("HOST", "127.0.0.1")
+    port = int(os.getenv("PORT", "8000"))
+    try:
+        mcp.auth = build_auth()
+    except ValueError as e:
+        sys.exit(str(e))
+
+    if mcp.auth is None and not is_loopback(host):
+        sys.exit(
+            f"Refusing to listen on {host} without authentication.\n"
+            "Set MCP_AUTH_TOKEN to a long random string, or set HOST=127.0.0.1."
+        )
+
+    print(
+        f"personal-finance-mcp on http://{host}:{port}/mcp "
+        f"(auth: {'bearer token' if mcp.auth else 'off, localhost only'})",
+        file=sys.stderr,
+        flush=True,
     )
+    mcp.run(transport="http", host=host, port=port)
+
+
+if __name__ == "__main__":
+    main()

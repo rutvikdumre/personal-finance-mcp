@@ -8,6 +8,17 @@ The MCP server. Defines `mcp = FastMCP("personal-finance-mcp")` at module scope 
 
 Every tool iterates every healthy Plaid Item, calls the corresponding Plaid endpoint, shapes the response, and returns `{"<data>": [...], "warnings": [...]}`. Partial failures (one bank unhealthy, others fine) surface as warnings rather than errors, so a single broken connection doesn't break every query.
 
+`main()` loads `.env`, then decides how to listen:
+
+- `HOST` defaults to `127.0.0.1`.
+- If `MCP_AUTH_TOKEN` is set, `BearerTokenVerifier` checks every request with a constant-time comparison.
+- If `HOST` isn't a loopback address and there's no token, it exits instead of serving bank data without auth.
+- `GET /health` is a public liveness route that returns no data.
+
+### `setup.py`
+
+One-time local setup: virtualenv, dependencies, Plaid keys (hidden input), bank linking with automatic token capture into `.env`, and Claude Code registration.
+
 ### `plaid_client.py`
 
 Plaid SDK wrapper.
@@ -20,7 +31,7 @@ Plaid SDK wrapper.
 
 ### `link_helper.py`
 
-Local-only FastAPI app for the one-time Plaid Link flow. Guarded at import time: if `HORIZON=1` is set, it `sys.exit`s before loading anything else. Creates a link token, serves a tiny HTML page with Plaid Link JS, receives the `public_token` callback, exchanges it, and **prints** the access token to the terminal — never writes to disk, never includes it in the HTTP response body.
+Local-only FastAPI app for the one-time Plaid Link flow. Guarded at import time: if it detects a hosted environment (`HORIZON`, `RENDER` or `RAILWAY_ENVIRONMENT` set), it exits before loading anything else. It's also left out of the Docker image. Creates a link token, serves a tiny HTML page with Plaid Link JS, receives the `public_token` callback, exchanges it, and **prints** the access token to the terminal — never writes to disk, never includes it in the HTTP response body.
 
 ## `/transactions/get` vs `/transactions/sync`
 

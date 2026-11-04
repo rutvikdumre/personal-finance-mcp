@@ -10,11 +10,11 @@ Missing env var. Check deployment logs. `PLAID_CLIENT_ID` and `PLAID_SECRET` are
 
 ## First MCP call after idle takes 20–60 seconds
 
-Scale-to-zero cold start on your host (common with Horizon free tier and similar PaaS). The first call builds the container; subsequent calls are fast (the 5-minute health cache also warms up after the first call). Not a bug.
+Your host put the service to sleep while idle (Render's free plan does this after 15 minutes). The first call wakes it up; later calls are fast (the 5-minute health cache also warms up after the first call). Not a bug.
 
 ## `get_institutions_status()` shows `re_auth_required`
 
-Plaid's `ITEM_LOGIN_REQUIRED`. The bank's session with Plaid has expired (password changed, MFA token rotated, bank forced a re-auth). Follow the update-mode flow in [DEPLOYMENT.md](DEPLOYMENT.md#handling-item_login_required-re-auth). Your access token stays the same after re-auth.
+Plaid's `ITEM_LOGIN_REQUIRED`. The bank's session with Plaid has expired (password changed, MFA token rotated, bank forced a re-auth). Follow the update-mode flow in [DEPLOYMENT.md](DEPLOYMENT.md#when-a-bank-needs-you-to-log-in-again-item_login_required).
 
 ## Plaid Link shows a bank as "unsupported" (common with Amex)
 
@@ -28,4 +28,12 @@ While you wait, you can develop against sandbox: flip `.env` to `PLAID_ENV=sandb
 
 ## `fastmcp inspect server.py:mcp` fails, or import error after `pip install`
 
-Plaid SDK version mismatch. Confirm `plaid-python==39.1.0` is installed: `.venv/bin/pip show plaid-python`. If something else is installed, `pip install -r requirements.txt --force-reinstall`. If the error is in FastMCP's tool registration, confirm `fastmcp==3.2.4`: both libraries pin major versions in `requirements.txt` to prevent silent drift.
+Plaid SDK version mismatch. Check the installed versions with `.venv/bin/pip show plaid-python fastmcp`. They should match the ranges in `requirements.txt` (plaid-python 39.x, fastmcp 3.x). If not, run `pip install -r requirements.txt --force-reinstall`.
+
+## Server exits with "Refusing to listen on 0.0.0.0 without authentication"
+
+Working as intended. The server is set to accept connections from other machines (the Docker image does this), so it needs `MCP_AUTH_TOKEN`. Set it to 32+ random characters, or set `HOST=127.0.0.1` to stay local.
+
+## Client gets `401 Unauthorized`
+
+The client isn't sending the token, or it doesn't match `MCP_AUTH_TOKEN` exactly. The header must be `Authorization: Bearer <token>`. Check for trailing spaces or line breaks when copying the token from your host's dashboard.

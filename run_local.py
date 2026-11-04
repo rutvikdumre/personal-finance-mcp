@@ -1,14 +1,11 @@
-"""Start the finance MCP on localhost only, with .env loaded.
+"""Start the server on this machine only (127.0.0.1), with .env loaded.
 
-Upstream server.py binds 0.0.0.0 (every device on your network, no auth) and
-doesn't load .env. This wrapper fixes both without modifying upstream code.
+Kept for older setups; `python server.py` does the same thing now.
 """
 import os
 
-from dotenv import load_dotenv
+os.environ.setdefault("HOST", "127.0.0.1")
 
-load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+from server import main  # noqa: E402
 
-import server  # noqa: E402  (registers the read-only tools)
-
-server.mcp.run(transport="http", host="127.0.0.1", port=int(os.getenv("PORT", "8000")))
+main()

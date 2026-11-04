@@ -1,24 +1,32 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.JosueM1109/personal-finance-mcp",
-  "description": "Self-hosted, read-only MCP server that connects your banks and investments via Plaid.",
+  "name": "io.github.rutvikdumre/personal-finance-mcp",
+  "description": "Self-hosted, read-only MCP server for your bank, card and brokerage data via Plaid. Run locally or deploy in one click.",
   "repository": {
-    "url": "https://github.com/JosueM1109/personal-finance-mcp",
+    "url": "https://github.com/rutvikdumre/personal-finance-mcp",
     "source": "github"
   },
-  "version": "1.0.0",
+  "version": "1.1.0",
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/josuem1109/personal-finance-mcp:1.0.0",
+      "identifier": "ghcr.io/rutvikdumre/personal-finance-mcp:1.1.0",
       "transport": {
         "type": "streamable-http",
-        "url": "http://localhost:{PORT}/mcp"
+        "url": "http://localhost:{PORT}/mcp",
+        "headers": [
+          {
+            "name": "Authorization",
+            "description": "Bearer <MCP_AUTH_TOKEN>",
+            "isRequired": true,
+            "isSecret": true
+          }
+        ]
       },
       "environmentVariables": [
         {
           "name": "PLAID_CLIENT_ID",
-          "description": "Your Plaid client_id from the Plaid dashboard (Team Settings -> API).",
+          "description": "Your Plaid client_id (dashboard.plaid.com -> Developers -> Keys).",
           "isRequired": true,
           "isSecret": true,
           "format": "string"
@@ -31,11 +39,21 @@
           "format": "string"
         },
         {
+          "name": "MCP_AUTH_TOKEN",
+          "description": "Bearer token clients must send. Required when the server is reachable beyond localhost (the Docker image listens on 0.0.0.0). At least 32 characters.",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
           "name": "PLAID_ENV",
           "description": "Plaid environment: production or sandbox.",
           "isRequired": false,
           "default": "production",
-          "choices": ["production", "sandbox"],
+          "choices": [
+            "production",
+            "sandbox"
+          ],
           "format": "string"
         },
         {

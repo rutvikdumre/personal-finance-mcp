@@ -1,62 +1,181 @@
-# personal-finance-mcp (local)
+# personal-finance-mcp
 
-Read-only MCP server that lets Claude query your bank and credit card accounts
-(Chase, Amex, and most US banks) through Plaid's free Trial plan (up to 10
-connections). Runs locally, on `127.0.0.1` only. Your keys never leave your machine.
+[![Tests](https://github.com/rutvikdumre/personal-finance-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/rutvikdumre/personal-finance-mcp/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![MCP](https://img.shields.io/badge/MCP-read--only-brightgreen.svg)](https://modelcontextprotocol.io)
 
-Based on [JosueM1109/personal-finance-mcp](https://github.com/JosueM1109/personal-finance-mcp)
-(MIT), vendored at upstream commit `33e0343` after a code review. The original
-README is in [`docs/UPSTREAM_README.md`](docs/UPSTREAM_README.md).
+Ask Claude (or any MCP client) about your own money: balances, spending, subscriptions, credit cards, loans and investments, across every bank you use.
 
-## Changes from upstream
+A self-hosted, **read-only** [MCP](https://modelcontextprotocol.io) server that connects to your accounts through [Plaid](https://plaid.com). Run it on your laptop, or deploy your own private copy in one click. No third-party finance app sits in the middle, and nothing can move money.
 
-| File | Why |
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/rutvikdumre/personal-finance-mcp)
+[![Deploy to Koyeb](https://www.koyeb.com/static/images/deploy/button.svg)](https://app.koyeb.com/deploy?name=personal-finance-mcp&type=git&repository=github.com/rutvikdumre/personal-finance-mcp&branch=main&builder=dockerfile&instance_type=free&ports=8000;http;/&env[PLAID_ENV]=production&env[PLAID_CLIENT_ID]=&env[PLAID_SECRET]=&env[MCP_AUTH_TOKEN]=)
+<!-- Railway needs a published template. Create one at railway.com/new/template from this repo, then uncomment:
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/YOUR-TEMPLATE-CODE?referralCode=&utm_medium=integration&utm_source=button&utm_campaign=personal-finance-mcp)
+-->
+
+> Unofficial. Not affiliated with or endorsed by Plaid Inc. You use your own Plaid account and keys.
+
+## What you can ask
+
+- "What's my total balance across all accounts?"
+- "How much did I spend on restaurants last month, and where?"
+- "Which subscriptions am I still paying for?"
+- "When is my credit card due, and what's the APR?"
+- "Show my brokerage holdings and dividends this year."
+- "Does any bank need me to log in again?"
+
+```
+you    : Any subscriptions I'm still paying for?
+claude : [calls get_recurring_transactions]
+         7 active recurring charges, $142/mo total:
+         Netflix $15.99, Spotify $11.99, gym $40, ...
+```
+
+## Tools
+
+All 9 tools are read-only. Each returns `{<data>: [...], "warnings": [...]}`, so one broken bank connection doesn't break the whole answer.
+
+| Tool | What it returns |
 |---|---|
-| `run_local.py` | Upstream `server.py` binds `0.0.0.0` with no auth, which exposes every linked account to anyone on the same Wi-Fi. It also never loads `.env`. This launcher binds `127.0.0.1` and loads `.env`. **Always start the server with this file.** |
-| `setup.py` | One-time setup: virtualenv, dependencies, Plaid keys (hidden input), bank linking with automatic token capture into `.env`, and Claude Code registration. |
+| `list_accounts` | Every account at every linked bank, with balances |
+| `get_balances` | Live current and available balances |
+| `get_transactions` | Transactions in a date range (up to 2 years back) |
+| `search_transactions` | Keyword search across merchant, description and counterparty |
+| `get_recurring_transactions` | Detected subscriptions, bills and paychecks |
+| `get_liabilities` | Credit cards, student loans and mortgages: APRs, due dates, minimums |
+| `get_investment_holdings` | Current positions with ticker and security details |
+| `get_investment_transactions` | Buys, sells and dividends in a date range |
+| `get_institutions_status` | Health of each bank connection |
 
-Upstream files are unchanged.
+## Quick start (local, about 10 minutes)
 
-## Setup
+You need Python 3.11+ and a free Plaid account.
 
-Needs Python 3.11+ and a Plaid account on the **Trial plan** (dashboard.plaid.com).
-In Plaid, enable the **Transactions**, **Liabilities** and **Investments** products, then
-copy your **Client ID** and **Production secret** from Build → Keys.
+**1. Get Plaid keys.** Sign up at [dashboard.plaid.com](https://dashboard.plaid.com/signup) and pick the free **Trial** plan (up to 10 bank connections). Under Products, enable **Transactions**, **Liabilities** and **Investments**. Copy your **client ID** and **Production secret** from Developers → Keys.
+
+> Big banks that use OAuth (Chase, Amex, Bank of America, Wells Fargo, Capital One, Schwab and others) must be registered once in the Plaid dashboard. See [Troubleshooting](docs/TROUBLESHOOTING.md#link-flow-errors-with-institution_registration_required). Want to try it first with fake data? Use your **Sandbox** secret, set `PLAID_ENV=sandbox`, and log in to any test bank with `user_good` / `pass_good`.
+
+**2. Install and link your banks.**
 
 ```bash
 git clone https://github.com/rutvikdumre/personal-finance-mcp.git
 cd personal-finance-mcp
-python3 setup.py        # Windows: py setup.py
+python3 setup.py          # Windows: py setup.py
 ```
 
-1. Paste the Client ID and Production secret when prompted.
-2. A browser opens at `localhost:8765`. Link each bank or card, then press Enter in the terminal.
-3. Start the server (leave the terminal open):
+`setup.py` creates a virtualenv, asks for your Plaid keys (hidden input), opens a local page where you log in to each bank, and saves everything to `.env`. The page lists every connected bank with its logo, accounts and connection status, so you can see at a glance what's linked and what needs a fresh login. If the `claude` CLI is installed, it also registers the server with Claude Code.
+
+**3. Start the server.**
+
+```bash
+.venv/bin/python server.py            # macOS / Linux
+.venv\Scripts\python.exe server.py    # Windows
+```
+
+It listens on `http://127.0.0.1:8000/mcp`, reachable only from your machine.
+
+**4. Connect your client.**
+
+```bash
+claude mcp add --scope user --transport http personal-finance http://127.0.0.1:8000/mcp
+```
+
+Then ask: *"list my accounts"*.
+
+## Deploy to the cloud
+
+Hosting it lets you use it from any device without keeping your laptop on. You still link banks locally first, because Plaid's login flow runs in your browser.
+
+1. Do steps 1 and 2 of the quick start. Your `.env` now holds `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV` and one `PLAID_TOKEN_<BANK>` per bank.
+2. Fork this repo, or use it as is, and click a deploy button:
+
+   | Host | How | Notes |
+   |---|---|---|
+   | **Render** | [Deploy button](https://render.com/deploy?repo=https://github.com/rutvikdumre/personal-finance-mcp) | Generates `MCP_AUTH_TOKEN` for you. The free plan sleeps after 15 minutes idle, so the first call after that takes about a minute. |
+   | **Koyeb** | [Deploy button](https://app.koyeb.com/deploy?name=personal-finance-mcp&type=git&repository=github.com/rutvikdumre/personal-finance-mcp&branch=main&builder=dockerfile&instance_type=free&ports=8000;http;/&env[PLAID_ENV]=production&env[PLAID_CLIENT_ID]=&env[PLAID_SECRET]=&env[MCP_AUTH_TOKEN]=) | Paste your own `MCP_AUTH_TOKEN` (see below). |
+   | **Railway** | New Project → Deploy from GitHub repo | Uses `railway.json`. Add the variables under Variables. |
+   | **Fly.io, AWS App Runner, Google Cloud Run, a VPS** | Build the `Dockerfile` | Set the same variables. Any host that runs a container works. |
+
+3. Add your variables in the host's dashboard: `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`, every `PLAID_TOKEN_*` line from your `.env`, and `MCP_AUTH_TOKEN` (Render creates this one for you). Generate a token with:
 
    ```bash
-   .venv/bin/python run_local.py            # macOS / Linux
-   .venv\Scripts\python.exe run_local.py    # Windows
+   python3 -c "import secrets; print(secrets.token_urlsafe(32))"
    ```
 
-4. In Claude Code, run `claude mcp add --scope user --transport http personal-finance http://127.0.0.1:8000/mcp`.
-   `setup.py` does this for you if the `claude` CLI is installed.
-5. Ask Claude: *"list my accounts"*.
+4. Connect your client with the token. Replace `<url>` with your app's address, for example `https://personal-finance-mcp-xxxx.onrender.com`.
 
-To link another bank or fix one that needs re-authentication, run `python3 setup.py` again.
+   **Claude Code**
 
-## Tools (all read-only)
+   ```bash
+   claude mcp add --scope user --transport http personal-finance <url>/mcp \
+     --header "Authorization: Bearer <MCP_AUTH_TOKEN>"
+   ```
 
-`list_accounts` · `get_balances` · `get_transactions` · `search_transactions` ·
-`get_recurring_transactions` · `get_liabilities` · `get_investment_holdings` ·
-`get_investment_transactions` · `get_institutions_status`
+   **Cursor, VS Code and other clients that take headers**
 
-No tool can move money or change anything at a bank.
+   ```json
+   {
+     "mcpServers": {
+       "personal-finance": {
+         "url": "<url>/mcp",
+         "headers": { "Authorization": "Bearer <MCP_AUTH_TOKEN>" }
+       }
+     }
+   }
+   ```
+
+   **Claude Desktop** (`claude_desktop_config.json`, through [mcp-remote](https://www.npmjs.com/package/mcp-remote))
+
+   ```json
+   {
+     "mcpServers": {
+       "personal-finance": {
+         "command": "npx",
+         "args": ["mcp-remote", "<url>/mcp", "--header", "Authorization:${AUTH_HEADER}"],
+         "env": { "AUTH_HEADER": "Bearer <MCP_AUTH_TOKEN>" }
+       }
+     }
+   }
+   ```
+
+To link another bank later, run `setup.py` again locally and add the new `PLAID_TOKEN_*` variable to your host. The host restarts with it; no code change needed.
+
+More detail, including Docker commands: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Security
 
-- `.env` holds the Plaid secret and the per-bank access tokens. It's gitignored
-  and set to `chmod 600` on macOS/Linux. **Never commit it.**
-- Fork or clone freely; your secrets live only in your local `.env`, never in the repo.
-- If a token leaks, revoke it in the Plaid dashboard and rotate the secret.
-- Don't expose port 8000 to the internet without adding auth first (see
-  `docs/DEPLOYMENT.md`). Remote access for claude.ai is a separate, later step.
+This server can read every account you link, so it's built to fail closed:
+
+- **Read-only.** No tool can move money or change anything at a bank. Write tools are out of scope for this project.
+- **Localhost by default.** Without configuration, it binds to `127.0.0.1`.
+- **No public server without auth.** If it listens on any other address, it refuses to start unless `MCP_AUTH_TOKEN` (32+ characters) is set. Every MCP request must then send `Authorization: Bearer <token>`. Only `/health`, which returns `ok` and no data, is open.
+- **Secrets stay out of the repo and the logs.** `.env` is gitignored (and `chmod 600` on macOS/Linux). Access tokens are wrapped so they print as `<redacted>`.
+- **The bank-linking tool never ships.** `link_helper.py` is excluded from the Docker image and refuses to run on Render or Railway.
+- **One deployment per person.** Don't share your URL or token. If either leaks, rotate `MCP_AUTH_TOKEN`, and if a Plaid token leaked, remove that bank in the Plaid dashboard.
+
+You are the Plaid customer for your own account, so Plaid's terms apply to you.
+
+## Docs
+
+- [Deployment](docs/DEPLOYMENT.md): every hosting option, Docker, adding banks, re-authenticating
+- [Troubleshooting](docs/TROUBLESHOOTING.md): empty results, unsupported banks, slow first calls
+- [Architecture](docs/ARCHITECTURE.md): how the code is laid out and why
+
+## Roadmap
+
+- OAuth login, so the server works as a custom connector in claude.ai on web and mobile (those only support OAuth, not bearer tokens)
+- One-command re-authentication for banks that need you to log in again
+
+## Contributing
+
+Issues and PRs are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Run the tests with `pytest`. They use mocked Plaid calls, so you don't need credentials.
+
+## Credits
+
+Built on [JosueM1109/personal-finance-mcp](https://github.com/JosueM1109/personal-finance-mcp) (MIT). This fork adds bearer-token auth with a safe-by-default bind, guided setup (`setup.py`), one-click deploys, and hermetic tests.
+
+## License
+
+[MIT](LICENSE)
